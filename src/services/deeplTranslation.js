@@ -1,31 +1,17 @@
+// src/services/deeplTranslation.js
 export async function translateFileWithDeepL(file, sourceLang, targetLang) {
-  const languageMap = {
-    "English": "EN",
-    "Vietnamese": "VI",
-    "Chinese": "ZH",
-    "French": "FR",
-    "German": "DE",
-    "Japanese": "JA",
-    "Korean": "KO",
-    "Russian": "RU",
-    "Spanish": "ES"
-  };
-
-  const sourceLanguageCode = languageMap[sourceLang] || "";
-  const targetLanguageCode = languageMap[targetLang] || "VI";
-
   try {
     const formData = new FormData();
     formData.append('file', file);
-    formData.append('target_lang', targetLanguageCode);
-    if (sourceLanguageCode) {
-      formData.append('source_lang', sourceLanguageCode);
+    formData.append('target_lang', targetLang);
+    if (sourceLang) {
+      formData.append('source_lang', sourceLang);
     }
 
     console.log('Sending translation request:', {
       file: file.name,
-      sourceLanguage: sourceLanguageCode,
-      targetLanguage: targetLanguageCode
+      sourceLanguage: sourceLang,
+      targetLanguage: targetLang
     });
 
     const response = await fetch('https://api-free.deepl.com/v2/document', {

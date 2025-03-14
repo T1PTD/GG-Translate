@@ -1,15 +1,12 @@
+// src/components/DocumentTranslation.jsx
 import { useState } from "react";
 import { translateFileWithDeepL } from "../services/deeplTranslation";
 import { translateWithGemini } from "../services/openaiTranslation";
 import mammoth from "mammoth";
 import { Document, Packer, Paragraph, TextRun } from "docx";
-import { pdfjs } from 'react-pdf';
 import { jsPDF } from "jspdf";
 import { parse } from 'node-html-parser';
 import * as pptxgen from "pptxgenjs";
-
-// Initialize PDF.js worker
-pdfjs.GlobalWorkerOptions.workerSrc = `//cdnjs.cloudflare.com/ajax/libs/pdf.js/${pdfjs.version}/pdf.worker.js`;
 
 export function DocumentTranslation() {
   const [file, setFile] = useState(null);
@@ -20,6 +17,7 @@ export function DocumentTranslation() {
   const [useFallback, setUseFallback] = useState(false);
   const [sourceLang, setSourceLang] = useState("auto");
   const [targetLang, setTargetLang] = useState("vi");
+  const [isDeepLAvailable, setIsDeepLAvailable] = useState(true);
 
   const supportedFormats = ['.txt', '.docx', '.doc', '.pdf', '.pptx', '.ppt', '.html'];
   
@@ -41,6 +39,7 @@ export function DocumentTranslation() {
     { code: "hi", name: "Tiếng Hindi" },
     { code: "th", name: "Tiếng Thái" },
   ];
+  
   const handleFileChange = (e) => {
     const selectedFile = e.target.files[0];
     if (selectedFile) {
@@ -88,33 +87,6 @@ export function DocumentTranslation() {
     });
   };
 
-  // Extract text from PDF files
-  const extractTextFromPDF = async (file) => {
-    return new Promise((resolve, reject) => {
-      const reader = new FileReader();
-      reader.onload = async (event) => {
-        try {
-          const typedArray = new Uint8Array(event.target.result);
-          const pdf = await pdfjs.getDocument(typedArray).promise;
-          
-          let fullText = '';
-          for (let i = 1; i <= pdf.numPages; i++) {
-            const page = await pdf.getPage(i);
-            const textContent = await page.getTextContent();
-            const pageText = textContent.items.map(item => item.str).join(' ');
-            fullText += pageText + '\n\n';
-          }
-          
-          resolve(fullText);
-        } catch (error) {
-          reject(error);
-        }
-      };
-      reader.onerror = (error) => reject(error);
-      reader.readAsArrayBuffer(file);
-    });
-  };
-
   // Extract text from HTML files
   const extractTextFromHTML = (htmlContent) => {
     try {
@@ -123,13 +95,6 @@ export function DocumentTranslation() {
     } catch (error) {
       throw new Error(`HTML parsing error: ${error.message}`);
     }
-  };
-
-  // Extract text from PowerPoint files (simplified - would need a specific library)
-  const extractTextFromPowerPoint = async (file) => {
-    // This is a placeholder - in a real implementation, you'd use a library
-    // that can extract text from PowerPoint files
-    throw new Error("PowerPoint extraction not implemented - using DeepL API instead");
   };
 
   // Extract text based on file type
@@ -145,12 +110,12 @@ export function DocumentTranslation() {
       case '.doc':
         return await extractTextFromDocx(file);
       case '.pdf':
-        return await extractTextFromPDF(file);
+        throw new Error("File PDF chỉ được hỗ trợ thông qua DeepL API.");
       case '.pptx':
       case '.ppt':
-        return await extractTextFromPowerPoint(file);
+        throw new Error("File PowerPoint chỉ được hỗ trợ thông qua DeepL API.");
       default:
-        throw new Error(`Unsupported file format: ${fileExtension}`);
+        throw new Error(`Định dạng file không được hỗ trợ: ${fileExtension}`);
     }
   };
 
@@ -231,32 +196,6 @@ export function DocumentTranslation() {
     }
   };
 
-  // Create a PowerPoint file from translated text
-  const createPowerPointFile = (text) => {
-    const pptx = new pptxgen();
-    const slide = pptx.addSlide();
-    
-    // Split text into chunks for different slides
-    const paragraphs = text.split('\n\n').filter(p => p.trim() !== '');
-    
-    // Create slides with translated content
-    for (let i = 0; i < paragraphs.length; i += 5) { // 5 paragraphs per slide
-      const slideContent = paragraphs.slice(i, i + 5).join('\n\n');
-      const slide = pptx.addSlide();
-      
-      slide.addText(slideContent, {
-        x: 0.5,
-        y: 0.5,
-        w: '90%',
-        h: '90%',
-        fontSize: 14,
-        color: '363636'
-      });
-    }
-    
-    return pptx.writeFile({ outputType: 'blob' });
-  };
-
   // Create file in original format with translated content
   const createFileInOriginalFormat = async (translatedText, originalFile) => {
     const fileExtension = '.' + originalFile.name.split('.').pop().toLowerCase();
@@ -275,12 +214,27 @@ export function DocumentTranslation() {
       case '.html':
         return createHTMLFile(fileContent, translatedText);
         
-      case '.pptx':
-      case '.ppt':
-        return await createPowerPointFile(translatedText);
-        
       default:
         return new Blob([translatedText], { type: 'text/plain' });
+    }
+  };
+
+  // Kiểm tra trạng thái DeepL API
+  const checkDeepLAvailability = async () => {
+    try {
+      // Tạo một file text nhỏ để kiểm tra
+      const testFile = new File(["Hello world"], "test.txt", { type: "text/plain" });
+      
+      // Thử dịch file này với DeepL
+      await translateFileWithDeepL(testFile, "EN", "VI");
+      
+      // Nếu không có lỗi, DeepL API khả dụng
+      setIsDeepLAvailable(true);
+      return true;
+    } catch (error) {
+      console.error("DeepL API không khả dụng:", error);
+      setIsDeepLAvailable(false);
+      return false;
     }
   };
 
@@ -301,17 +255,92 @@ export function DocumentTranslation() {
       setError(null);
       const fileExtension = '.' + file.name.split('.').pop().toLowerCase();
 
-      // First try DeepL for all supported formats (it handles formatting better)
+      // Chuyển đổi mã ngôn ngữ từ tên đầy đủ sang mã ISO
+      const languageMap = {
+        "auto": "",
+        "vi": "VI",
+        "en": "EN",
+        "zh": "ZH",
+        "ja": "JA",
+        "ko": "KO",
+        "fr": "FR",
+        "de": "DE",
+        "ru": "RU",
+        "es": "ES",
+        "it": "IT",
+        "pt": "PT",
+        "ar": "AR",
+        "hi": "HI",
+        "th": "TH"
+      };
+      
+      const sourceLanguageCode = languageMap[sourceLang] || "";
+      const targetLanguageCode = languageMap[targetLang] || "VI";
+
+      // Kiểm tra xem file có phải là PDF hoặc PowerPoint không
+      const isPdfOrPowerPoint = fileExtension === '.pdf' || fileExtension === '.ppt' || fileExtension === '.pptx';
+      
+      // Nếu là PDF hoặc PowerPoint, kiểm tra DeepL API trước
+      if (isPdfOrPowerPoint) {
+        setProgress("Đang kiểm tra kết nối đến DeepL API...");
+        const isDeepLWorking = await checkDeepLAvailability();
+        
+        if (!isDeepLWorking) {
+          throw new Error(`Không thể dịch file ${fileExtension} vì DeepL API không khả dụng. Vui lòng thử lại sau hoặc chọn định dạng file khác.`);
+        }
+      }
+
+      // Thử sử dụng DeepL API trước
       try {
-        await handleDeepLTranslation();
-        return; // If DeepL succeeds, we're done
+        setProgress("Đang dịch với DeepL API...");
+        
+        const translatedBlob = await translateFileWithDeepL(
+          file,
+          sourceLanguageCode,
+          targetLanguageCode
+        );
+        
+        setProgress("Đã hoàn thành dịch file!");
+        
+        // Kiểm tra xem blob có dữ liệu không
+        if (!translatedBlob || translatedBlob.size === 0) {
+          throw new Error("Không nhận được dữ liệu từ DeepL API");
+        }
+        
+        // Tạo URL tải xuống
+        const downloadUrl = URL.createObjectURL(translatedBlob);
+        const fileName = file.name.split(".");
+        const fileExtension = fileName.pop();
+        const fileNameWithoutExtension = fileName.join(".");
+        const translatedFileName = `${fileNameWithoutExtension}_${targetLang}.${fileExtension}`;
+
+        // Tạo link tải xuống và tự động click
+        const downloadLink = document.createElement("a");
+        downloadLink.href = downloadUrl;
+        downloadLink.download = translatedFileName;
+        document.body.appendChild(downloadLink);
+        downloadLink.click();
+        document.body.removeChild(downloadLink);
+
+        // Giải phóng URL
+        setTimeout(() => {
+          URL.revokeObjectURL(downloadUrl);
+        }, 100);
+        
+        return;
       } catch (deepLError) {
         console.log("DeepL translation failed, falling back to text extraction:", deepLError);
         setProgress("DeepL API không khả dụng, đang thử phương pháp khác...");
         setUseFallback(true);
+        setIsDeepLAvailable(false);
+        
+        // Nếu là file PDF hoặc PowerPoint, không thể tiếp tục với phương pháp dự phòng
+        if (isPdfOrPowerPoint) {
+          throw new Error(`Không thể dịch file ${fileExtension} khi DeepL API không khả dụng. Vui lòng thử lại sau hoặc chọn định dạng file khác.`);
+        }
       }
 
-      // If DeepL fails, try extracting text and using Gemini API
+      // Nếu DeepL thất bại, thử trích xuất văn bản và sử dụng Gemini API
       try {
         setProgress("Đang trích xuất nội dung văn bản...");
         const extractedText = await extractTextFromFile(file);
@@ -331,7 +360,26 @@ export function DocumentTranslation() {
         const translatedBlob = await createFileInOriginalFormat(translatedContent, file);
         
         setProgress("Đã hoàn thành dịch file!");
-        downloadTranslatedFile(translatedBlob, getMimeType(fileExtension), fileExtension);
+        
+        // Tạo URL tải xuống
+        const downloadUrl = URL.createObjectURL(new Blob([translatedBlob], { type: getMimeType(fileExtension) }));
+        const fileName = file.name.split(".");
+        fileName.pop(); // Remove extension
+        const fileNameWithoutExtension = fileName.join(".");
+        const translatedFileName = `${fileNameWithoutExtension}_${targetLang}${fileExtension}`;
+
+        // Tạo link tải xuống và tự động click
+        const downloadLink = document.createElement("a");
+        downloadLink.href = downloadUrl;
+        downloadLink.download = translatedFileName;
+        document.body.appendChild(downloadLink);
+        downloadLink.click();
+        document.body.removeChild(downloadLink);
+
+        // Giải phóng URL
+        setTimeout(() => {
+          URL.revokeObjectURL(downloadUrl);
+        }, 100);
       } catch (extractionError) {
         throw new Error(`Không thể trích xuất nội dung: ${extractionError.message}`);
       }
@@ -341,35 +389,6 @@ export function DocumentTranslation() {
     } finally {
       setIsTranslating(false);
     }
-  };
-
-  const handleDeepLTranslation = async () => {
-    setProgress("Đang tải file lên DeepL...");
-    const translatedBlob = await translateFileWithDeepL(
-      file,
-      sourceLang,
-      targetLang
-    );
-
-    setProgress("Đã hoàn thành dịch file!");
-    
-    // Create download URL
-    const downloadUrl = URL.createObjectURL(translatedBlob);
-    const fileName = file.name.split(".");
-    const fileExtension = fileName.pop();
-    const fileNameWithoutExtension = fileName.join(".");
-    const translatedFileName = `${fileNameWithoutExtension}_${targetLang}.${fileExtension}`;
-
-    // Create download link and auto-click
-    const downloadLink = document.createElement("a");
-    downloadLink.href = downloadUrl;
-    downloadLink.download = translatedFileName;
-    document.body.appendChild(downloadLink);
-    downloadLink.click();
-    document.body.removeChild(downloadLink);
-
-    // Release URL
-    URL.revokeObjectURL(downloadUrl);
   };
 
   const getMimeType = (fileExtension) => {
@@ -389,23 +408,6 @@ export function DocumentTranslation() {
       default:
         return 'text/plain';
     }
-  };
-
-  const downloadTranslatedFile = (blob, mimeType, fileExtension) => {
-    const downloadUrl = URL.createObjectURL(blob);
-    const fileName = file.name.split(".");
-    fileName.pop(); // Remove extension
-    const fileNameWithoutExtension = fileName.join(".");
-    const translatedFileName = `${fileNameWithoutExtension}_${targetLang}${fileExtension}`;
-
-    const downloadLink = document.createElement("a");
-    downloadLink.href = downloadUrl;
-    downloadLink.download = translatedFileName;
-    document.body.appendChild(downloadLink);
-    downloadLink.click();
-    document.body.removeChild(downloadLink);
-
-    URL.revokeObjectURL(downloadUrl);
   };
 
   return (
@@ -461,6 +463,15 @@ export function DocumentTranslation() {
         </div>
       </div>
 
+      {!isDeepLAvailable && (
+        <div className="deepl-warning">
+          <p className="warning-message">
+            <strong>Cảnh báo:</strong> DeepL API hiện không khả dụng. File PDF và PowerPoint sẽ không thể dịch được.
+            Các định dạng khác như .txt, .docx và .html vẫn có thể dịch bằng phương pháp dự phòng.
+          </p>
+        </div>
+      )}
+
       <div className="file-upload-container">
         <input
           type="file"
@@ -486,6 +497,16 @@ export function DocumentTranslation() {
         <div className="file-info">
           <p>Tên file: {file.name}</p>
           <p>Kích thước: {(file.size / 1024).toFixed(2)} KB</p>
+          {file.name.endsWith('.pdf') && (
+            <p className="pdf-notice">
+              <strong>Lưu ý:</strong> File PDF chỉ được dịch thông qua DeepL API. {!isDeepLAvailable && "DeepL API hiện không khả dụng, vui lòng thử lại sau."}
+            </p>
+          )}
+          {(file.name.endsWith('.ppt') || file.name.endsWith('.pptx')) && (
+            <p className="ppt-notice">
+              <strong>Lưu ý:</strong> File PowerPoint chỉ được dịch thông qua DeepL API. {!isDeepLAvailable && "DeepL API hiện không khả dụng, vui lòng thử lại sau."}
+            </p>
+          )}
         </div>
       )}
 
@@ -502,6 +523,29 @@ export function DocumentTranslation() {
           </p>
         )}
       </div>
+
+      <style jsx>{`
+        .deepl-warning {
+          background-color: #fff3cd;
+          border-left: 4px solid #ffc107;
+          padding: 15px;
+          margin-bottom: 20px;
+          border-radius: 4px;
+        }
+        
+        .warning-message {
+          color: #856404;
+          margin: 0;
+        }
+        
+        .pdf-notice, .ppt-notice {
+          color: #721c24;
+          background-color: #f8d7da;
+          padding: 10px;
+          border-radius: 4px;
+          margin-top: 10px;
+        }
+      `}</style>
     </div>
   );
 }
