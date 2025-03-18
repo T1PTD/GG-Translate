@@ -2,8 +2,7 @@ import React, { useState, useEffect } from "react";
 import { TranslationTabs } from "./components/TranslationTabs";
 import { LanguageControls } from "./components/LanguageControls";
 import { TranslationPanel } from "./components/TranslationPanel";
-// Thay đổi đường dẫn import để phù hợp với tên file thực tế
-import { ImageTranslation } from "./components/ImageTranslate"; // Thay vì ImageTranslation
+import { ImageTranslation } from "./components/ImageTranslate";
 import { DocumentTranslation } from "./components/DocumentTranslation";
 import { translateWithGemini } from "./services/openaiTranslation";
 import debounce from "lodash.debounce";
@@ -46,14 +45,24 @@ function App() {
   useEffect(() => {
     if (autoTranslate && text.trim()) {
       debouncedTranslate(text);
+    } else if (!text.trim()) {
+      // Nếu văn bản trống, xóa luôn bản dịch
+      setTranslatedText("");
     }
+    
     return () => {
       debouncedTranslate.cancel();
     };
   }, [text, selectedSourceLang, selectedTargetLang, autoTranslate]);
 
   const handleTextChange = (e) => {
-    setText(e.target.value);
+    const newText = e.target.value;
+    setText(newText);
+    
+    // Nếu người dùng xóa hết văn bản, xóa luôn bản dịch
+    if (!newText.trim()) {
+      setTranslatedText("");
+    }
   };
 
   const handleTranslate = () => {
@@ -101,6 +110,16 @@ function App() {
       <main className="translation-section">
         {activeTab === "text" && (
           <>
+            <div className="auto-translate-toggle">
+              <label className="auto-translate-label">
+                <input
+                  type="checkbox"
+                  checked={autoTranslate}
+                  onChange={() => setAutoTranslate(!autoTranslate)}
+                />
+                <span className="toggle-text">Tự động dịch</span>
+              </label>
+            </div>
             <LanguageControls
               selectedSourceLang={selectedSourceLang}
               selectedTargetLang={selectedTargetLang}
