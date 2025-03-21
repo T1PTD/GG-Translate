@@ -18,6 +18,18 @@ export function TranslationPanel({
   const [isSpeakingSource, setIsSpeakingSource] = useState(false);
   const [isSpeakingTarget, setIsSpeakingTarget] = useState(false);
 
+  // Define language mapping for speech synthesis
+  const langMap = {
+    'Vietnamese': 'vi-VN',
+    'English': 'en-US',
+    'Chinese': 'zh-CN',
+    'French': 'fr-FR',
+    'German': 'de-DE',
+    'Japanese': 'ja-JP',
+    'Korean': 'ko-KR',
+    'Spanish': 'es-ES'
+  };
+
   useEffect(() => {
     // Initialize speech recognition
     if ('webkitSpeechRecognition' in window || 'SpeechRecognition' in window) {
@@ -26,7 +38,9 @@ export function TranslationPanel({
       
       recognitionInstance.continuous = true;
       recognitionInstance.interimResults = true;
-      recognitionInstance.lang = 'vi-VN'; // Default to Vietnamese - can be made dynamic
+      
+      // Set recognition language based on source language
+      recognitionInstance.lang = langMap[selectedSourceLang] || 'vi-VN';
       
       recognitionInstance.onresult = (event) => {
         const transcript = Array.from(event.results)
@@ -57,12 +71,12 @@ export function TranslationPanel({
       if (recognition) {
         recognition.stop();
       }
-      // Dừng phát âm khi component unmount
+      // Stop speech synthesis when component unmounts
       if (window.speechSynthesis) {
         window.speechSynthesis.cancel();
       }
     };
-  }, []);
+  }, [selectedSourceLang]); // Re-initialize when source language changes
 
   const toggleListening = () => {
     if (!recognition) return;
@@ -76,28 +90,17 @@ export function TranslationPanel({
     }
   };
 
-  // Hàm phát âm cho văn bản nguồn
+  // Function to speak source text
   const speakSourceText = () => {
     if (!text || isSpeakingSource || isSpeakingTarget) return;
     
     if ('speechSynthesis' in window) {
       const utterance = new SpeechSynthesisUtterance(text);
       
-      // Đặt ngôn ngữ phát âm dựa trên ngôn ngữ nguồn
-      const langMap = {
-        'Vietnamese': 'vi-VN',
-        'English': 'en-US',
-        'Chinese': 'zh-CN',
-        'French': 'fr-FR',
-        'German': 'de-DE',
-        'Japanese': 'ja-JP',
-        'Korean': 'ko-KR',
-        'Spanish': 'es-ES'
-      };
-      
+      // Set speech language based on source language
       utterance.lang = langMap[selectedSourceLang] || 'en-US';
       
-      // Tìm giọng phù hợp với ngôn ngữ
+      // Find appropriate voice for the language
       const voices = window.speechSynthesis.getVoices();
       const voice = voices.find(v => v.lang.includes(utterance.lang.split('-')[0]));
       if (voice) {
@@ -114,28 +117,17 @@ export function TranslationPanel({
     }
   };
 
-  // Hàm phát âm cho bản dịch
+  // Function to speak translated text
   const speakTargetText = () => {
     if (!translatedText || isSpeakingSource || isSpeakingTarget) return;
     
     if ('speechSynthesis' in window) {
       const utterance = new SpeechSynthesisUtterance(translatedText);
       
-      // Đặt ngôn ngữ phát âm dựa trên ngôn ngữ đích
-      const langMap = {
-        'Vietnamese': 'vi-VN',
-        'English': 'en-US',
-        'Chinese': 'zh-CN',
-        'French': 'fr-FR',
-        'German': 'de-DE',
-        'Japanese': 'ja-JP',
-        'Korean': 'ko-KR',
-        'Spanish': 'es-ES'
-      };
-      
+      // Set speech language based on target language
       utterance.lang = langMap[selectedTargetLang] || 'en-US';
       
-      // Tìm giọng phù hợp với ngôn ngữ
+      // Find appropriate voice for the language
       const voices = window.speechSynthesis.getVoices();
       const voice = voices.find(v => v.lang.includes(utterance.lang.split('-')[0]));
       if (voice) {
@@ -165,7 +157,7 @@ export function TranslationPanel({
         <div className="text-controls">
           <span className="char-count">{charCount}/5000</span>
           <div className="text-buttons">
-            {/* Thêm nút phát âm cho văn bản nguồn */}
+            {/* Source text speech button */}
             {text && (
               <button 
                 className={`speak-button ${isSpeakingSource ? 'speaking' : ''}`} 
@@ -217,7 +209,7 @@ export function TranslationPanel({
         ></textarea>
         <div className="text-controls">
           <div className="text-buttons">
-            {/* Nút phát âm cho bản dịch */}
+            {/* Target text speech button */}
             {translatedText && (
               <button 
                 className={`speak-button ${isSpeakingTarget ? 'speaking' : ''}`} 

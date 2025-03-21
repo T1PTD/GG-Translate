@@ -1,5 +1,5 @@
 // src/components/DocumentTranslation.jsx
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { translateFileWithDeepL } from '../services/deeplTranslation';
 
 export function DocumentTranslation() {
@@ -20,6 +20,17 @@ export function DocumentTranslation() {
     { code: 'JA', name: 'Japanese' },
     { code: 'ES', name: 'Spanish' }
   ];
+
+  // Effect to update target language if it's the same as source language
+  useEffect(() => {
+    if (selectedSourceLang === selectedTargetLang) {
+      // Find the first language that's not the source language
+      const differentLang = supportedLanguages.find(lang => lang.code !== selectedSourceLang);
+      if (differentLang) {
+        setSelectedTargetLang(differentLang.code);
+      }
+    }
+  }, [selectedSourceLang]);
 
   const handleFileChange = (e) => {
     const selectedFile = e.target.files[0];
@@ -113,6 +124,11 @@ export function DocumentTranslation() {
     setSelectedTargetLang(temp);
   };
 
+  // Get available target languages (exclude the source language)
+  const getTargetLanguages = () => {
+    return supportedLanguages.filter(lang => lang.code !== selectedSourceLang);
+  };
+
   return (
     <div className="document-translation">
       <h2>Document Translation</h2>
@@ -148,7 +164,7 @@ export function DocumentTranslation() {
             value={selectedTargetLang}
             onChange={(e) => setSelectedTargetLang(e.target.value)}
           >
-            {supportedLanguages.map(lang => (
+            {getTargetLanguages().map(lang => (
               <option key={lang.code} value={lang.code}>
                 {lang.name}
               </option>

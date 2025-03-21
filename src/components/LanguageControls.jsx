@@ -1,53 +1,55 @@
-import React, { useState } from 'react';
+import React, { useState } from "react";
 
-export const LanguageControls = ({
+export function LanguageControls({
   selectedSourceLang,
   selectedTargetLang,
   setSelectedSourceLang,
   setSelectedTargetLang,
   swapLanguages,
-}) => {
-  const [sourceDropdownOpen, setSourceDropdownOpen] = useState(false);
-  const [targetDropdownOpen, setTargetDropdownOpen] = useState(false);
+  supportedLanguages,
+  getTargetLanguages
+}) {
+  const [showSourceOptions, setShowSourceOptions] = useState(false);
+  const [showTargetOptions, setShowTargetOptions] = useState(false);
 
-  const commonLanguages = ["English", "Vietnamese", "Chinese", "French", "German", "Japanese", "Korean", "Spanish"];
-  
   const handleSourceLanguageSelect = (lang) => {
     setSelectedSourceLang(lang);
-    setSourceDropdownOpen(false);
+    setShowSourceOptions(false);
   };
 
   const handleTargetLanguageSelect = (lang) => {
     setSelectedTargetLang(lang);
-    setTargetDropdownOpen(false);
+    setShowTargetOptions(false);
+  };
+
+  const getLanguageLabel = (value) => {
+    const language = supportedLanguages.find(lang => lang.value === value);
+    return language ? language.label : value;
   };
 
   return (
     <div className="language-container">
       <div className="language-selection-area">
-        {/* Source language */}
-        <div className="language-section source-lang">
-          <div 
-            className="selected-language" 
-            onClick={() => setSourceDropdownOpen(!sourceDropdownOpen)}
+        <div className="language-section">
+          <div
+            className="selected-language"
+            onClick={() => setShowSourceOptions(!showSourceOptions)}
           >
-            {selectedSourceLang}
+            {getLanguageLabel(selectedSourceLang)}
             <span className="dropdown-arrow">▼</span>
           </div>
-          
-          {sourceDropdownOpen && (
+          {showSourceOptions && (
             <div className="language-options">
-              <div className="language-option" onClick={() => handleSourceLanguageSelect("Language detection")}>
-                Auto detect
-              </div>
               <div className="language-options-grid">
-                {commonLanguages.map((lang) => (
-                  <div 
-                    key={lang} 
-                    className={`language-option ${selectedSourceLang === lang ? "active" : ""}`}
-                    onClick={() => handleSourceLanguageSelect(lang)}
+                {supportedLanguages.map((lang) => (
+                  <div
+                    key={lang.value}
+                    className={`language-option ${
+                      selectedSourceLang === lang.value ? "active" : ""
+                    }`}
+                    onClick={() => handleSourceLanguageSelect(lang.value)}
                   >
-                    {lang}
+                    {lang.label}
                   </div>
                 ))}
               </div>
@@ -55,31 +57,30 @@ export const LanguageControls = ({
           )}
         </div>
 
-        {/* Swap button */}
         <button className="swap-button" onClick={swapLanguages}>
           <span className="swap-icon">⇄</span>
         </button>
 
-        {/* Target language */}
-        <div className="language-section target-lang">
-          <div 
-            className="selected-language" 
-            onClick={() => setTargetDropdownOpen(!targetDropdownOpen)}
+        <div className="language-section">
+          <div
+            className="selected-language"
+            onClick={() => setShowTargetOptions(!showTargetOptions)}
           >
-            {selectedTargetLang}
+            {getLanguageLabel(selectedTargetLang)}
             <span className="dropdown-arrow">▼</span>
           </div>
-          
-          {targetDropdownOpen && (
+          {showTargetOptions && (
             <div className="language-options">
               <div className="language-options-grid">
-                {commonLanguages.map((lang) => (
-                  <div 
-                    key={lang} 
-                    className={`language-option ${selectedTargetLang === lang ? "active" : ""}`}
-                    onClick={() => handleTargetLanguageSelect(lang)}
+                {getTargetLanguages().map((lang) => (
+                  <div
+                    key={lang.value}
+                    className={`language-option ${
+                      selectedTargetLang === lang.value ? "active" : ""
+                    }`}
+                    onClick={() => handleTargetLanguageSelect(lang.value)}
                   >
-                    {lang}
+                    {lang.label}
                   </div>
                 ))}
               </div>
@@ -89,4 +90,4 @@ export const LanguageControls = ({
       </div>
     </div>
   );
-};
+}

@@ -1,4 +1,4 @@
-import React, { useState, useRef } from "react";
+import React, { useState, useRef, useEffect } from "react";
 import Tesseract from "tesseract.js";
 import { translateWithGemini } from "../services/openaiTranslation";
 
@@ -12,12 +12,35 @@ export function ImageTranslation() {
   const [selectedSourceLang, setSelectedSourceLang] = useState("English");
   const [selectedTargetLang, setSelectedTargetLang] = useState("Vietnamese");
   const [ocrProgress, setOcrProgress] = useState(0);
-  const [activeTab, setActiveTab] = useState("original"); // "original" hoặc "translated"
+  const [activeTab, setActiveTab] = useState("original"); // "original" or "translated"
   
   const fileInputRef = useRef(null);
   const pasteAreaRef = useRef(null);
 
-  // Xử lý khi người dùng chọn file
+  // Supported languages
+  const supportedLanguages = [
+    { value: "English", label: "Tiếng Anh" },
+    { value: "Vietnamese", label: "Tiếng Việt" },
+    { value: "Chinese", label: "Tiếng Trung" },
+    { value: "Japanese", label: "Tiếng Nhật" },
+    { value: "Korean", label: "Tiếng Hàn" },
+    { value: "French", label: "Tiếng Pháp" },
+    { value: "German", label: "Tiếng Đức" },
+    { value: "Spanish", label: "Tiếng Tây Ban Nha" }
+  ];
+
+  // Effect to update target language if it's the same as source language
+  useEffect(() => {
+    if (selectedSourceLang === selectedTargetLang) {
+      // Find the first language that's not the source language
+      const differentLang = supportedLanguages.find(lang => lang.value !== selectedSourceLang);
+      if (differentLang) {
+        setSelectedTargetLang(differentLang.value);
+      }
+    }
+  }, [selectedSourceLang]);
+
+  // Handle file selection
   const handleFileChange = (e) => {
     const file = e.target.files[0];
     if (file) {
@@ -25,7 +48,7 @@ export function ImageTranslation() {
     }
   };
 
-  // Xử lý khi người dùng kéo thả file
+  // Handle drag and drop
   const handleDrop = (e) => {
     e.preventDefault();
     e.stopPropagation();
@@ -35,7 +58,7 @@ export function ImageTranslation() {
     }
   };
 
-  // Xử lý khi người dùng paste ảnh
+  // Handle paste from clipboard
   const handlePaste = (e) => {
     const items = (e.clipboardData || e.originalEvent.clipboardData).items;
     
@@ -48,17 +71,17 @@ export function ImageTranslation() {
     }
   };
 
-  // Xử lý file ảnh đã chọn
+  // Process the selected image file
   const processImageFile = (file) => {
     if (!file) return;
     
-    // Kiểm tra định dạng file
+    // Check file format
     if (!file.type.match('image.*')) {
       setError("Vui lòng chọn file hình ảnh");
       return;
     }
     
-    // Tạo URL để hiển thị preview
+    // Create URL for preview
     const imageUrl = URL.createObjectURL(file);
     setPreviewUrl(imageUrl);
     setSelectedImage(file);
@@ -67,7 +90,7 @@ export function ImageTranslation() {
     setError(null);
   };
 
-  // Xử lý OCR để trích xuất văn bản từ ảnh
+  // Extract text from image using OCR
   const extractTextFromImage = async () => {
     if (!previewUrl) return;
     
@@ -76,7 +99,7 @@ export function ImageTranslation() {
     setError(null);
     
     try {
-      // Xác định ngôn ngữ OCR dựa trên ngôn ngữ nguồn
+      // Determine OCR language based on source language
       const langMap = {
         'English': 'eng',
         'Vietnamese': 'vie',
@@ -90,7 +113,7 @@ export function ImageTranslation() {
       
       const ocrLang = langMap[selectedSourceLang] || 'eng';
       
-      // Sử dụng Tesseract.recognize thay vì createWorker
+      // Use Tesseract.recognize
       const result = await Tesseract.recognize(
         previewUrl,
         ocrLang,
@@ -103,11 +126,11 @@ export function ImageTranslation() {
         }
       );
       
-      // Lấy văn bản đã trích xuất
+      // Get extracted text
       const text = result.data.text;
       setExtractedText(text);
       
-      // Dịch văn bản đã trích xuất
+      // Translate extracted text
       if (text.trim()) {
         try {
           const translated = await translateWithGemini(
@@ -130,29 +153,34 @@ export function ImageTranslation() {
     }
   };
 
-  // Xử lý khi người dùng thay đổi ngôn ngữ nguồn
+  // Handle source language change
   const handleSourceLanguageChange = (e) => {
     setSelectedSourceLang(e.target.value);
   };
 
-  // Xử lý khi người dùng thay đổi ngôn ngữ đích
+  // Handle target language change
   const handleTargetLanguageChange = (e) => {
     setSelectedTargetLang(e.target.value);
   };
 
-  // Xử lý khi người dùng nhấn nút "Chọn ảnh từ thiết bị"
+  // Get available target languages (exclude the source language)
+  const getTargetLanguages = () => {
+    return supportedLanguages.filter(lang => lang.value !== selectedSourceLang);
+  };
+
+  // Handle browse button click
   const handleBrowseClick = () => {
     fileInputRef.current.click();
   };
 
-  // Xử lý khi người dùng nhấn nút "Dán ảnh từ clipboard"
+  // Handle clipboard button click
   const handleClipboardClick = () => {
     if (pasteAreaRef.current) {
       pasteAreaRef.current.focus();
     }
   };
 
-  // Xử lý khi người dùng nhấn nút "Xóa ảnh"
+  // Handle clear image button click
   const handleClearImage = () => {
     setSelectedImage(null);
     setPreviewUrl(null);
@@ -161,16 +189,23 @@ export function ImageTranslation() {
     setError(null);
   };
 
-  // Xử lý khi người dùng nhấn nút "Copy văn bản"
+  // Handle copy text button click
   const handleCopyText = (text) => {
     navigator.clipboard.writeText(text);
     alert("Đã sao chép văn bản vào clipboard!");
   };
 
-  // Ngăn chặn hành vi mặc định khi kéo thả
+  // Prevent default behavior for drag and drop
   const preventDefault = (e) => {
     e.preventDefault();
     e.stopPropagation();
+  };
+
+  // Swap languages
+  const swapLanguages = () => {
+    const temp = selectedSourceLang;
+    setSelectedSourceLang(selectedTargetLang);
+    setSelectedTargetLang(temp);
   };
 
   return (
@@ -217,36 +252,26 @@ export function ImageTranslation() {
               <div className="language-selector">
                 <label>Ngôn ngữ trong ảnh:</label>
                 <select value={selectedSourceLang} onChange={handleSourceLanguageChange}>
-                  <option value="English">Tiếng Anh</option>
-                  <option value="Vietnamese">Tiếng Việt</option>
-                  <option value="Chinese">Tiếng Trung</option>
-                  <option value="Japanese">Tiếng Nhật</option>
-                  <option value="Korean">Tiếng Hàn</option>
-                  <option value="French">Tiếng Pháp</option>
-                  <option value="German">Tiếng Đức</option>
-                  <option value="Spanish">Tiếng Tây Ban Nha</option>
+                  {supportedLanguages.map(lang => (
+                    <option key={lang.value} value={lang.value}>
+                      {lang.label}
+                    </option>
+                  ))}
                 </select>
               </div>
               <div className="language-swap">
-                <button className="swap-button" onClick={() => {
-                  const temp = selectedSourceLang;
-                  setSelectedSourceLang(selectedTargetLang);
-                  setSelectedTargetLang(temp);
-                }}>
+                <button className="swap-button" onClick={swapLanguages}>
                   ⇄
                 </button>
               </div>
               <div className="language-selector">
                 <label>Dịch sang:</label>
                 <select value={selectedTargetLang} onChange={handleTargetLanguageChange}>
-                  <option value="Vietnamese">Tiếng Việt</option>
-                  <option value="English">Tiếng Anh</option>
-                  <option value="Chinese">Tiếng Trung</option>
-                  <option value="Japanese">Tiếng Nhật</option>
-                  <option value="Korean">Tiếng Hàn</option>
-                  <option value="French">Tiếng Pháp</option>
-                  <option value="German">Tiếng Đức</option>
-                  <option value="Spanish">Tiếng Tây Ban Nha</option>
+                  {getTargetLanguages().map(lang => (
+                    <option key={lang.value} value={lang.value}>
+                      {lang.label}
+                    </option>
+                  ))}
                 </select>
               </div>
             </div>
