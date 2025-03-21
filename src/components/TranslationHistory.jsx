@@ -1,45 +1,35 @@
-// src/components/TranslationHistoryView.jsx
-import React, { useState, useEffect } from "react";
-import { 
-  getTranslationHistory, 
-  clearTranslationHistory, 
-  deleteTranslationEntry,
-  saveToFavorites
-} from "../services/translationHistory";
+// src/components/TranslationHistory.jsx
+import React, { useState, useEffect } from 'react';
+import { getTranslationHistory, clearTranslationHistory, deleteTranslationEntry } from '../services/translationHistory';
 
-export function TranslationHistoryView({ onSelectHistoryItem }) {
+export function TranslationHistory({ isOpen, onClose }) {
   const [history, setHistory] = useState([]);
-  const [searchTerm, setSearchTerm] = useState("");
 
-  // Load history on component mount
   useEffect(() => {
-    loadHistory();
-  }, []);
+    if (isOpen) {
+      // Load history when sidebar opens
+      loadHistory();
+    }
+  }, [isOpen]);
 
   const loadHistory = () => {
-    const historyData = getTranslationHistory();
-    setHistory(historyData);
-  };
-
-  const handleDeleteHistoryItem = (id, event) => {
-    event.stopPropagation(); // Prevent triggering the parent click
-    deleteTranslationEntry(id);
-    loadHistory();
+    const translationHistory = getTranslationHistory();
+    setHistory(translationHistory);
   };
 
   const handleClearHistory = () => {
-    if (window.confirm("Bạn có chắc chắn muốn xóa toàn bộ lịch sử dịch?")) {
+    if (window.confirm('Bạn có chắc chắn muốn xóa toàn bộ lịch sử dịch?')) {
       clearTranslationHistory();
-      loadHistory();
+      setHistory([]);
     }
   };
 
-  const handleAddToFavorites = (entry, event) => {
-    event.stopPropagation(); // Prevent triggering the parent click
-    saveToFavorites(entry);
-    // Optional: show a confirmation message
+  const handleDeleteEntry = (id) => {
+    deleteTranslationEntry(id);
+    loadHistory(); // Reload history after deletion
   };
 
+  // Format date for display
   const formatDate = (dateString) => {
     const date = new Date(dateString);
     return date.toLocaleString('vi-VN', {
@@ -51,87 +41,51 @@ export function TranslationHistoryView({ onSelectHistoryItem }) {
     });
   };
 
-  // Filter items based on search term
-  const filteredHistory = history.filter(item => 
-    item.sourceText.toLowerCase().includes(searchTerm.toLowerCase()) || 
-    item.translatedText.toLowerCase().includes(searchTerm.toLowerCase())
-  );
-
   return (
-    <div className="translation-history-view">
+    <div className={`history-sidebar ${isOpen ? 'open' : ''}`}>
       <div className="history-header">
         <h2>Lịch sử dịch</h2>
-        <div className="history-controls">
-          <div className="search-input-wrapper">
-            <span className="search-icon">🔍</span>
-            <input
-              type="text"
-              placeholder="Tìm kiếm trong lịch sử..."
-              value={searchTerm}
-              onChange={(e) => setSearchTerm(e.target.value)}
-            />
-            {searchTerm && (
-              <button 
-                className="clear-search-btn"
-                onClick={() => setSearchTerm("")}
-                title="Xóa tìm kiếm"
-              >
-                ✕
-              </button>
-            )}
-          </div>
-          {history.length > 0 && (
-            <button className="clear-history-btn" onClick={handleClearHistory}>
-              Xóa tất cả
-            </button>
-          )}
+        <div className="history-actions">
+          <button className="clear-history-btn" onClick={handleClearHistory}>
+            Xóa tất cả
+          </button>
+          <button className="close-history-btn" onClick={onClose}>
+            ✕
+          </button>
         </div>
       </div>
 
-      <div className="history-list">
-        {filteredHistory.length === 0 ? (
+      <div className="history-content">
+        {history.length === 0 ? (
           <div className="empty-history">
-            {searchTerm 
-              ? "Không tìm thấy kết quả nào."
-              : "Chưa có lịch sử dịch nào."}
+            <p>Không có lịch sử dịch nào.</p>
           </div>
         ) : (
-          filteredHistory.map((item) => (
-            <div 
-              key={item.id} 
-              className="history-item"
-              onClick={() => onSelectHistoryItem(item)}
-            >
-              <div className="history-item-content">
-                <div className="history-item-text">
-                  <div className="history-source-text">{item.sourceText}</div>
-                  <div className="history-translated-text">{item.translatedText}</div>
-                </div>
-                <div className="history-item-info">
-                  <div className="history-item-langs">
-                    {item.sourceLang} → {item.targetLang}
+          <div className="history-list">
+            {history.map((entry) => (
+              <div className="history-entry" key={entry.id}>
+                <div className="history-entry-header">
+                  <div className="history-languages">
+                    {entry.sourceLang} → {entry.targetLang}
                   </div>
-                  <div className="history-item-time">{formatDate(item.timestamp)}</div>
+                  <div className="history-entry-actions">
+                    <span className="history-date">{formatDate(entry.timestamp)}</span>
+                    <button 
+                      className="delete-entry-btn" 
+                      onClick={() => handleDeleteEntry(entry.id)}
+                      title="Xóa mục này"
+                    >
+                      🗑️
+                    </button>
+                  </div>
+                </div>
+                <div className="history-texts">
+                  <div className="history-source-text">{entry.sourceText}</div>
+                  <div className="history-translated-text">{entry.translatedText}</div>
                 </div>
               </div>
-              <div className="history-item-actions">
-                <button 
-                  className="favorite-btn"
-                  onClick={(e) => handleAddToFavorites(item, e)}
-                  title="Lưu vào mục yêu thích"
-                >
-                  <span className="action-icon">⭐</span>
-                </button>
-                <button 
-                  className="delete-btn"
-                  onClick={(e) => handleDeleteHistoryItem(item.id, e)}
-                  title="Xóa khỏi lịch sử"
-                >
-                  <span className="action-icon">🗑️</span>
-                </button>
-              </div>
-            </div>
-          ))
+            ))}
+          </div>
         )}
       </div>
     </div>
